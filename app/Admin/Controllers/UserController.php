@@ -57,10 +57,7 @@ class UserController extends AdminController
         $show->field('mobile', __('Mobile'));
         $show->field('email_verified_at', __('Email verified at'));
         $show->field('password', __('Password'));
-        $show->field('status',__('Status'))->using(['0' => '禁用', '1' => '正常'])->label([
-            0=> 'warning',
-            1 => 'success',
-        ]);
+        $show->field('status',__('Status'))->using(['0' => '禁用', '1' => '正常'])->label();
         $show->field('remember_token', __('Remember token'));
         $show->field('created_at', __('Created at'));
         $show->field('updated_at', __('Updated at'));

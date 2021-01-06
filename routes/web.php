@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Route;
 | contains the "web" middleware group. Now create something great!
 |
 */
+Route::get('/login', 'LoginController@login');
+Route::get('/websoket','IndexController@index');
+Route::get('/ws/push','IndexController@push');
 
 Route::get('/', function () {
     return view('welcome');

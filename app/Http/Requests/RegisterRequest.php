@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
-
 class RegisterRequest extends ApiRequestCommon
 {
     /**
@@ -24,9 +22,14 @@ class RegisterRequest extends ApiRequestCommon
     public function rules()
     {
         return [
-            'name' => 'required',//名字最低字段长度6
-            'mobile'=>'required|unique:users',//email格式，在users表里不可重复
-            'password'=>'required|min:6|confirmed',//密码最低字段长度6
+            'name' => 'required|min:6',
+//            'email'=>'required|email|unique:users',
+            'mobile'=>[
+                'required',
+                'regex:/^1\d{10}$/',
+                'unique:users'
+            ],
+            'password'=>'required|min:6|max:16',//密码最低字段长度6
             //确认密码字段的格式必须是 密码字段_confirmation
             'password_confirmation' => 'required',
 
@@ -35,12 +38,18 @@ class RegisterRequest extends ApiRequestCommon
     public function messages()
     {
         return [
-            'name.required' => '用户名不能为空',
+
+            'name.required'  => '名字不能为空',
+            'name.min:6'  => '名字格式不正确',
             'mobile.required'  => '手机号不能为空',
-//            'mobile.mobile'  => '手机号格式不正确',
+            'mobile.regex'  => '手机号格式不正确',
             'mobile.unique:users'  => '该用户已存在',
+//            'email.required'  => '邮箱不能为空',
+//            'email.email'  => '邮箱格式不正确',
+//            'email.unique:users'  => '邮箱不能重复',
             'password.required'  => '密码不能为空',
-            'password.min:6' => '密码不正确',
+            'password.min:6' => '密码格式不正确',
+            'password.max:16' => '密码格式不正确',
             'password_confirmation.required' => '确认密码不能为空！',
 
         ];

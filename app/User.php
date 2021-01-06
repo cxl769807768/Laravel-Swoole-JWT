@@ -6,8 +6,9 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Encore\Admin\Traits\DefaultDatetimeFormat;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject
 {
     use DefaultDatetimeFormat;
     use Notifiable;
@@ -18,7 +19,7 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = [
-        'name', 'email','mobile', 'password',
+        'name', 'mobile', 'password',
     ];
 
     /**
@@ -38,7 +39,17 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
 
+    public function getJWTCustomClaims()
+    {
+        return [];
+        //若有多个JWT验证（如admin验证），则区分
+        //return ['role'=>'user'];
+    }
     /**
      * @param $value
      * 生成密码
@@ -55,5 +66,18 @@ class User extends Authenticatable
         $this->api_token = str_random(128);
         $this->save();
         return $this->api_token;
+    }
+    public function getList($params){
+        $query = self::newQuery();
+        if(isset($params['tid']) && !empty($params['tid'])) $query->where('tid','=',$params['tid']);
+        if(isset($params['name']) && !empty($params['name']))  $query->where('name','like',$params['name'].'%');
+        if(isset($params['status']) && !empty($params['status']))  $query->where('status','=',$params['status']);
+        if(isset($params['page']) && !empty($params['page'])){
+            return $query->paginate($params['pageSize'], ['*'],  'page',$params['page']);
+
+        }else{
+            return $query->take(5)->get();
+        }
+
     }
 }

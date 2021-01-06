@@ -11,6 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class ApiRequestCommon extends FormRequest
 {
+    /**
+     * @param Validator $validator
+     * 修改验证不通过的错误返回格式
+     */
     protected function failedValidation(Validator $validator)
     {
         foreach((new ValidationException($validator))->errors() as $key =>$val){
@@ -20,7 +24,7 @@ class ApiRequestCommon extends FormRequest
 
         }
         throw new HttpResponseException(response()->json([
-            'code'=>400,
+            'code'=>500,
             'msg' => $values[0][0]
         ], JsonResponse::HTTP_UNPROCESSABLE_ENTITY));
 

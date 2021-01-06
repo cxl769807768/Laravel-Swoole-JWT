@@ -4,25 +4,30 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Redirect;
 
-class LoginController extends Controller
+class LoginController extends CommonController
 {
-    public function login(){
-
+    public function login(Request $request){
+       print_r($request->path());
     }
-    public function logout()
+    public function postLogin(Request $request)
     {
-        $user = Auth::guard('api')->user();
-
-        if ($user) {
-            $user->api_token = null;
-            $user->save();
+        if (Auth::attempt(array('email' => $request->input('username'), 'password' => $request->input('password'))))
+        {
+            return Redirect::intended('/');
         }
-
-        return response()->json([
-            'code'=>200,
-            'msg'=>"退出成功",
-            'data'=>[]
-        ]);
+    }
+    public function save(Request $request){
+        //jwt token
+        $credentials = $request->only('name', 'password');
+        if (!$token = auth()->attempt($credentials)) {
+            return response()->json(['result'=>'failed']);
+        }
+        return $this->responseWithToken($token);
+    }
+    public function out(Request $request)
+    {
+        $this->logout($request);
     }
 }

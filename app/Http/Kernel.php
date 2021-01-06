@@ -64,6 +64,8 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         /**注册api的token验证中间件****/
-        'auth.api'=> \App\Http\Middleware\ApiToken::class,
+        'api.auth'=> \App\Http\Middleware\ApiAuth::class,
+        /**注册api的token验证JWT中间件****/
+        'refreshtoken' => \App\Http\Middleware\RefreshToken::class,
     ];
 }
