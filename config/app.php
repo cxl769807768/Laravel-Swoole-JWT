@@ -140,6 +140,7 @@ return [
         /*
          * Laravel Framework Service Providers...
          */
+        Fruitcake\Cors\CorsServiceProvider::class,
         Illuminate\Auth\AuthServiceProvider::class,
         Illuminate\Broadcasting\BroadcastServiceProvider::class,
         Illuminate\Bus\BusServiceProvider::class,
@@ -166,6 +167,7 @@ return [
         /*
          * Package Service Providers...
          */
+        Hhxsv5\LaravelS\Illuminate\LaravelSServiceProvider::class,
         SwooleTW\Http\LaravelServiceProvider::class,
         Tymon\JWTAuth\Providers\LaravelServiceProvider::class,
         /*
@@ -177,7 +179,9 @@ return [
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         /**图片上传服务提供者**/
-        Intervention\Image\ImageServiceProvider::class
+        Intervention\Image\ImageServiceProvider::class,
+                //验证码
+        Mews\Captcha\CaptchaServiceProvider::class,
 
     ],
 
@@ -235,7 +239,7 @@ return [
         // JWT
         'JWTAuth'=> Tymon\JWTAuth\Facades\JWTAuth::class,
         'JWTFactory'=> Tymon\JWTAuth\Facades\JWTFactory::class,
-
+        'Captcha' => Mews\Captcha\Facades\Captcha::class,
 
     ],
 

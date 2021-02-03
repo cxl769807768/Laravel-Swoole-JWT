@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProductsController extends CommonController
@@ -26,7 +25,7 @@ class ProductsController extends CommonController
         $where['page'] = (int)$page ?? 1;
         $data = $this->product->getList($where);
         return response()->json([
-            'code'=>200,
+            'code'=>!empty($data->data) ? 200 : 0,
             'msg'=>"获取成功",
             'data'=>$data
         ]);
@@ -39,6 +38,24 @@ class ProductsController extends CommonController
             'code'=>200,
             'msg'=>"获取成功",
             'data'=>$data
+        ]);
+    }
+    public function create(Request $request)
+    {
+
+        $result = $this->product::create([
+            'name' => $request->input('name'),
+            'subtitle' => $request->input('subtitle'),
+            'cover' => $request->input('cover'),
+            'slideshow' => $request->input('slideshow'),
+            'phone' => $request->input('phone'),
+            'introduce' => $request->input('introduce'),
+            'desc' => $request->input('desc'),
+            'tid' => $request->input('tid'),
+        ]);
+        return response()->json([
+            'code'=>!empty($result) ? 200 :500,
+            'msg'=>!empty($result) ? "发布成功" : "发布失败",
         ]);
     }
 }

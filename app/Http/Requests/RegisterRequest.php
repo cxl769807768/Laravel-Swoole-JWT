@@ -32,6 +32,7 @@ class RegisterRequest extends ApiRequestCommon
             'password'=>'required|min:6|max:16',//密码最低字段长度6
             //确认密码字段的格式必须是 密码字段_confirmation
             'password_confirmation' => 'required',
+            'captcha' => 'required|captcha',
 
         ];
     }
@@ -51,6 +52,8 @@ class RegisterRequest extends ApiRequestCommon
             'password.min:6' => '密码格式不正确',
             'password.max:16' => '密码格式不正确',
             'password_confirmation.required' => '确认密码不能为空！',
+            'captcha.required' => '验证码不能为空',
+            'captcha.captcha' => '请输入正确的验证码',
 
         ];
     }

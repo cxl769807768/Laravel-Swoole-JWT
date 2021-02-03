@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 use Throwable;
@@ -29,19 +30,6 @@ class Handler extends ExceptionHandler
     ];
 
     /**
-     * Report or log an exception.
-     *
-     * @param  \Throwable  $exception
-     * @return void
-     *
-     * @throws \Exception
-     */
-    public function report(Throwable $exception)
-    {
-        parent::report($exception);
-    }
-
-    /**
      * Render an exception into an HTTP response.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -52,25 +40,16 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $exception)
     {
+
         // 参数验证错误的异常，我们需要返回 400 的 http code 和一句错误信息
         if ($exception instanceof ValidationException) {
-            return response()->json(['msg' => $exception->errors()], 400);
+            return response()->json(['msg' => array_first(array_collapse($exception->errors()))], 400);
         }
+        // 用户认证的异常，我们需要返回 401 的 http code 和错误信息
         if ($exception instanceof UnauthorizedHttpException) {
-            $preException = $exception->getPrevious();
-            if ($preException instanceof
-                \Tymon\JWTAuth\Exceptions\TokenExpiredException) {
-                return response()->json(['msg' => 'TOKEN已过期！','code' => 406]);
-            } else if ($preException instanceof
-                \Tymon\JWTAuth\Exceptions\TokenInvalidException) {
-                return response()->json(['msg' => 'TOKEN无效！','code' => 406]);
-            } else if ($preException instanceof
-                \Tymon\JWTAuth\Exceptions\TokenBlacklistedException) {
-                return response()->json(['msg' => 'TOKEN已退出！','code' => 406]);
-            }
-            if ($exception->getMessage() === 'Token not provided') {
-                return response()->json(['msg' => 'Token为空！','code' => 406]);
-            }
+            return response()->json(['msg'=>$exception->getMessage(),'code'=>406], 401);
         }
+        return parent::render($request, $exception);
+
     }
 }

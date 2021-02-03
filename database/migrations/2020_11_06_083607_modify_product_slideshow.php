@@ -14,7 +14,7 @@ class ModifyProductSlideshow extends Migration
     public function up()
     {
         Schema::table('product', function (Blueprint $table) {
-            $table->json('slideshow', 200)->change();
+            $table->text('slideshow')->change();
         });
     }
 

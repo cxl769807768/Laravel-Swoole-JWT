@@ -41,6 +41,7 @@ class ProductController extends AdminController
         }
         $grid->column('id', __('Id'));
         $grid->column('name', "名称");
+        $grid->column('subtitle', "副标题");
         $grid->column('cover', "封面")->image();
         $grid->column('phone', "手机号");
         $grid->column('tid', "栏目ID");
@@ -66,6 +67,7 @@ class ProductController extends AdminController
     {
         $show = new Show(Product::findOrFail($id));
         $show->field('name', "名称");
+        $show->field('subtitle', "副标题");
         $show->field('cover', "封面");
         $show->field('phone', "手机号");
         $show->field('tid', "栏目ID");
@@ -95,11 +97,12 @@ class ProductController extends AdminController
             1 => '正常',
         ];
         $form->text('name', '名称');
+        $form->text('subtitle', 'subtitle');
         //$form->image('cover','封面')->thumbnail('small', $width = 356, $height = 200)->removable();
         $form->image('cover','封面')->removable();
         //$form->multipleImage('slideshow','轮播图')->thumbnail('small', $width = 356, $height = 200)->removable();
         $form->multipleImage('slideshow','轮播图')->removable();
-        $form->textarea('introduce', '详情');
+        $form->editor('introduce', __('详情'))->required();
         $form->mobile('phone', __('联系电话'));
         $form->select('tid', '栏目')->options($types);
         $form->select('status', '状态')->options($directors);

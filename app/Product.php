@@ -13,18 +13,19 @@ class Product extends BaseModel
     use Notifiable;
     public $table = "product";
 
-    public function __construct()
-    {
-
-    }
-
     protected $fillable = [
-        'name', 'cover', 'phone', 'status', 'tid'
+        'name', 'subtitle','cover','slideshow', 'phone', 'status', 'tid','introduce'
     ];
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+    protected $attributes = [
+        'status' => 1,
+        'created_at'=>1,
+
+    ];
+
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      * 多对一的关系
@@ -35,21 +36,38 @@ class Product extends BaseModel
     }
     public function setSlideshowAttribute($value)
     {
+        $value = is_array($value)? $value : explode(',',$value);
         if (is_array($value)) {
-            $this->attributes['slideshow'] = json_encode($value);
+            foreach ($value as $k => $v){
+                $v = str_replace(env('APP_URL'),'',$v);
+                //处理后台和前端上传的文件路径
+                $value[$k] = strpos($v,'/uploads/')!==false ? $v : '/uploads/images/admin/'.$v;
+            }
+            $this->attributes['slideshow'] = serialize($value);
         }
     }
 
     public function getSlideshowAttribute($value)
     {
         if(!empty($value)){
-            return json_decode($value, true);
+            $value = unserialize($value);
+            foreach ($value as $k => $v){
+                $value[$k] = env('APP_URL').$v;
+            }
+            return $value;
 
         }
     }
+    public function setCoverAttribute($value)
+    {
+        $result = empty($value) ? '' : str_replace(env('APP_URL'),'',$value);
+        //处理后台和前端上传的文件路径
+        return $this->attributes['cover'] = empty($result) ? '' : (strpos($result,'/uploads/')!==false ? $result : '/uploads/images/admin/'.$result);
+
+    }
     public function getCoverAttribute($value)
     {
-        return $this->attributes['cover'] = empty($value) ? '' : config('filesystems.disks.admin.url')."/".$value;
+        return $this->attributes['cover'] = empty($value) ? '' : env('APP_URL').$value;
 
     }
     public function getList($params){

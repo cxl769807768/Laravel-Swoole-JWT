@@ -70,9 +70,9 @@ return [
 //        ],
         'admin' => [
             'driver' => 'local',
-            'root' => public_path('uploads/admin'),
+            'root' => public_path('/uploads/images/admin'),
             'visibility' => 'public',
-            'url' => env('APP_URL').'/uploads/admin',
+            'url' => env('APP_URL').'/uploads/images/admin',
         ],
 
     ],

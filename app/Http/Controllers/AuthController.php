@@ -7,9 +7,11 @@ use App\Http\Requests\RegisterRequest;
 use App\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Tymon\JWTAuth\Facades\JWTAuth;
-
+use Captcha;
 
 /**
  * Class AuthController
@@ -83,11 +85,11 @@ class AuthController extends CommonController
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function logout()
+    public function logOut()
     {
         auth('api')->logout();
 
-        return response()->json(['message' => '退出成功！']);
+        return response()->json(['code'=>200,'message' => '退出成功！']);
     }
 
     /**
@@ -96,24 +98,47 @@ class AuthController extends CommonController
      */
     public function getUser()
     {
-        return response()->json(auth('api')->user());
+        return $this->json(200,'',auth('api')->user());
     }
     public function register(RegisterRequest $request)
     {
+
         // 创建用户
         $result =  User::create([
+            'avatar' => $request->input('avatar') ?? '',
+            'nickname' => $request->input('nickname') ?? '',
+            'sign' => $request->input('sign') ?? '',
             'mobile' => $request->input('mobile'),
-            'name' =>  substr_replace($request->input('mobile'),'****',3,4),
+            'name' =>  $request->input('name') ? $request->input('name') : substr_replace($request->input('mobile'),'****',3,4),
             'password' => Hash::make($request->input('password')),
         ]);
-        if (empty($result)) {
-            return response()->json(['success' => '创建用户成功']);
+
+        if (!empty($result)) {
+
+            //生成token
+            $userInfo = User::where('mobile','=',$request->input('mobile'))->first();
+            $this->userToGrouop($userInfo['id']);
+            //生成token
+            $token = auth('api')->login($userInfo);
+            if (!$token) {
+                return response()->json(['code'=>500,'message' => 'token生成失败'], 401);
+            }
+            return $this->respondWithToken($token);
+
         } else {
             return response()->json(['message' => '创建用户失败']);
         }
 
     }
+    public function userToGrouop(int $user_id){
 
+        //将用户添加到所有人都在群
+        DB::table('c_group_member')->insert([
+            'user_id' => $user_id,
+            'group_id' => 10008
+        ]);
+
+    }
     /**
      * Refresh a token.
      * 刷新token，如果开启黑名单，以前的token便会失效。
@@ -139,7 +164,7 @@ class AuthController extends CommonController
             'data'=>[
                 'access_token' => $token,
                 'token_type' => 'bearer',
-                'expires_in' => auth('api')->factory()->getTTL() * 60,
+                'expires_in' => auth('api')->factory()->getTTL(),
                 'userInfo'=>auth('api')->user()
             ]
         ]);

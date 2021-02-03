@@ -1,67 +1,297 @@
 <?php
 
 namespace App\Services;
-use Hhxsv5\LaravelS\Swoole\WebSocketHandlerInterface;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Route;
-use Swoole\Http\Request;
-use Swoole\WebSocket\Frame;
-use Swoole\WebSocket\Server;
 
+use Hhxsv5\LaravelS\Swoole\WebSocketHandlerInterface;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use JWTAuth;
+use Swoole\Http\Request;
+
+
+/**
+ * @see https://wiki.swoole.com/wiki/page/400.html
+ */
 class WebSocketService implements WebSocketHandlerInterface
 {
-    /**@var \Swoole\Table $wsTable */
-    private $wsTable;
+    // 声明没有参数的构造函数
     public function __construct()
     {
-        $this->wsTable = app('swoole')->wsTable;
-    }
-    // 场景：WebSocket中UserId与FD绑定
-    public function onOpen(Server $server, Request $request)
-    {
-        // var_dump(app('swoole') === $server);// 同一实例
-        /**
-         * 获取当前登录的用户
-         * 此特性要求建立WebSocket连接的路径要经过Authenticate之类的中间件。
-         * 例如：
-         * 浏览器端：var ws = new WebSocket("ws://127.0.0.1:5200/ws");
-         * 那么Laravel中/ws路由就需要加上类似Authenticate的中间件。
-         **/
-         Route::get('/ws', function () {
-         // 响应状态码200的任意内容
-            return 'websocket';
-         })->middleware(['auth']);
 
-        $user = Auth::user();
-        $userId = $user ? $user->id : 0; // 0 表示未登录的访客用户
-        //$userId = mt_rand(1000, 10000);
-         if (!$userId) {
-             // 未登录用户直接断开连接
-             $server->disconnect($request->fd);
-             return;
-         }
-        $this->wsTable->set('uid:' . $userId, ['value' => $request->fd]);// 绑定uid到fd的映射
-        $this->wsTable->set('fd:' . $request->fd, ['value' => $userId]);// 绑定fd到uid的映射
-        $server->push($request->fd, "Welcome to LaravelS #{$request->fd}");
     }
-    public function onMessage(Server $server, Frame $frame)
+    public function sendByUid($server,$uid,$data,$offline_msg = false)
     {
-        // 广播
-        foreach ($this->wsTable as $key => $row) {
-            if (strpos($key, 'uid:') === 0 && $server->isEstablished($row['value'])) {
-                $content = sprintf('Broadcast: new message "%s" from #%d', $frame->data, $frame->fd);
-                $server->push($row['value'], $content);
+        $fd = app('swoole')->wsTable->get('uid:'.$uid);//获取接受者fd
+        Log::info($fd);
+        if ($fd == false){
+            //这里说明该用户已下线，日后做离线消息用
+            if (!$offline_msg) {
+                $data = [
+                    'user_id'   => $uid,
+                    'data'      => json_encode($data),
+                ];
+                //插入离线消息
+                DB::table('c_offline_message')->insert($data);
+            }
+            return false;
+        }
+        return $server->push($fd['value'],json_encode($data));//发送消息
+    }
+    /**
+     * @author woann<304550409@qq.com>
+     * @param \swoole_websocket_server $server
+     * @param \swoole_http_request $request
+     * @des 链接开启时
+     */
+    public function onOpen(\swoole_websocket_server $server, Request $request)
+    {
+        Log::info('websoket open');
+        $uid = $request->get['uid'];
+        $userInfo = DB::table('users')->find($uid);
+        if(!isset($uid)){
+            $data = [
+                "type" => "token is error"
+            ];
+            $server->push($request->fd,json_encode($data));
+            return;
+        }
+        if($userInfo == null){
+            $data = [
+                "type" => "token is error"
+            ];
+            $server->push($request->fd,json_encode($data));
+            return;
+        }
+        Log::info($request->fd);
+        //绑定fd变更状态
+        app('swoole')->wsTable->set('uid:' . $userInfo->id, ["value"=>$request->fd]);// 绑定uid到fd的映射
+        app('swoole')->wsTable->set('fd:' . $request->fd,["value"=>$userInfo->id]);// 绑定fd到uid的映射
+        DB::table('users')->where('id', $userInfo->id)->update(['line_status' => 'online']);//标记为在线
+        //给好友发送上线通知，用来标记头像去除置灰
+        $friend_list = DB::table('c_friend')->where('user_id',$userInfo->id)->get();
+        $data = [
+            "type"  => "friendStatus",
+            "uid"   => $userInfo->id,
+            "status"=> 'online'
+        ];
+        foreach ($friend_list as $k => $v) {
+            $this->sendByUid($server,$v->friend_id,$data);
+        }
+        //获取未读消息盒子数量
+        $count = DB::Table('c_system_message')->where('user_id',$userInfo->id)->where('read',0)->count();
+        $data = [
+            "type"      => "msgBox",
+            "count"     => $count
+        ];
+        //检查离线消息
+        $offline_messgae = DB::table('c_offline_message')->where('user_id', $userInfo->id)->where('status', 0)->get();
+        foreach ($offline_messgae as $k=>$v) {
+            $res = $this->sendByUid($server,$userInfo->id,json_decode($v->data));
+            if ($res) {
+                //如果推送成功标记当前离线消息为已发送
+                DB::table('c_offline_message')->where('id', $v->id)->update(['status' => 1]);
             }
         }
+        $server->push($request->fd,json_encode($data));
+
     }
-    public function onClose(Server $server, $fd, $reactorId)
+
+    /**
+     * @author woann<304550409@qq.com>
+     * @param \swoole_websocket_server $server
+     * @param \swoole_websocket_frame $frame
+     * @des 接收到消息
+     */
+    public function onMessage(\swoole_websocket_server $server, \swoole_websocket_frame $frame)
     {
-        $uid = $this->wsTable->get('fd:' . $fd);
-        if ($uid !== false) {
-            $this->wsTable->del('uid:' . $uid['value']); // 解绑uid映射
+
+        $info = json_decode($frame->data);//接受收到的数据并转为object
+        $userInfo = DB::table('users')->find($info->uid);
+
+        if (!isset($info->type)) {
+            return;
         }
-        $this->wsTable->del('fd:' . $fd);// 解绑fd映射
-        $server->push($fd, "Goodbye #{$fd}");
+        //根据type字段判断消息类型并执行对应操作
+        switch ($info->type) {
+            //心跳包
+            case "ping":
+                break;
+            //聊天消息
+            case "chatMessage":
+                if ($info->data->to->type == "friend") {
+                    //好友消息
+                    $data = [
+                        'username' => $info->data->mine->username,
+                        'avatar' => $info->data->mine->avatar,
+                        'id' => $info->data->mine->id,
+                        'type' => $info->data->to->type,
+                        'content' => $info->data->mine->content,
+                        'cid' => 0,
+                        'mine'=> $userInfo->id == $info->data->to->id ? true : false,//要通过判断是否是我自己发的
+                        'fromid' => $info->data->mine->id,
+                        'timestamp' => time()*1000
+                    ];
+                    if ($info->data->to->id == $userInfo->id) {
+                        return;
+                    }
+                    $this->sendByUid($server,$info->data->to->id,$data,true);
+                    //记录聊天记录
+                    $record_data = [
+                        'user_id'       => $info->data->mine->id,
+                        'friend_id'     => $info->data->to->id,
+                        'group_id'      => 0,
+                        'content'       => $info->data->mine->content,
+                        'time'    => time()
+                    ];
+                    DB::table('c_chat_record')->insert($record_data);
+                } elseif ($info->data->to->type == "group") {
+                    //群消息
+                    $data = [
+                        'username' => $info->data->mine->username,
+                        'avatar' => $info->data->mine->avatar,
+                        'id' => $info->data->to->id,
+                        'type' => $info->data->to->type,
+                        'content' => $info->data->mine->content,
+                        'cid' => 0,
+
+                        'mine'=> false,//要通过判断是否是我自己发的
+                        'fromid' => $info->data->mine->id,
+                        'timestamp' => time()*1000
+                    ];
+                    $list = DB::table('c_group_member as gm')
+                        ->leftJoin('users as u','u.id','=','gm.user_id')
+                        ->select('u.id')
+                        ->where('group_id', $info->data->to->id)
+                        ->get();
+                    foreach ($list as $k => $v) {
+                        if ( $v->id == $userInfo->id) {
+                            continue;
+                        }
+                        $this->sendByUid($server,$v->id,$data,true);
+                    }
+                    //记录聊天记录
+                    $record_data = [
+                        'user_id'       => $info->data->mine->id,
+                        'friend_id'     => 0,
+                        'group_id'      => $info->data->to->id,
+                        'content'       => $info->data->mine->content,
+                        'time'    => time()
+                    ];
+                    DB::table('c_chat_record')->insert($record_data);
+                }
+                break;
+            //发送好友请求
+            case "addFriend":
+                $friend_id = $info->to_user_id;
+                $system_message_data = [
+                    'user_id'   => $friend_id,//接受者
+                    'from_id'   => $userInfo->id,//来源者
+                    'remark'    => $info->remark,
+                    'type'      => 0,
+                    'group_id'  => $info->to_friend_group_id,
+                    'time'      => time()
+                ];
+                $isFriend = DB::table('c_friend')->where('friend_id',$friend_id)->where('user_id',$userInfo->id)->first();
+                if ($isFriend) {
+                    $data = [
+                        'type' => 'layer',
+                        'code' => 500,
+                        'msg'   => '对方已经是你的好友，不可重复添加'
+                    ];
+                    $this->sendByUid($server,$userInfo->id,$data);
+                    return;
+                }
+                if ($friend_id == $userInfo->id){
+
+                    $data = [
+                        'type' => 'layer',
+                        'code' => 500,
+                        'msg'   => '不能添加自己为好友'
+                    ];
+                    $this->sendByUid($server,$userInfo->id,$data);
+                    return;
+                }
+                DB::table('c_system_message')->insert($system_message_data);
+                //获取该接受者未读消息数量
+                $count = DB::Table('c_system_message')->where('user_id',$friend_id)->where('read',0)->count();
+                $data = [
+                    "type"      => "msgBox",
+                    "count"     => $count
+                ];
+                $this->sendByUid($server,$friend_id,$data,true);
+                break;
+            //追加好友到好友列表
+            case "addList":
+                $user = DB::table('users')->find($userInfo->id);
+                $data = [
+                    "type" => "addList",
+                    "data" => [
+                        "type"  => "friend",
+                        "avatar"    => $user->avatar,
+                        "username" => $user->nickname,
+                        "groupid" => $info->fromgroup,
+                        "id"        => $user->id,
+                        "sign"    => $user->sign,
+                        "status"    => $user->line_status,
+                    ]
+                ];
+                //获取未读消息盒子数量
+                $count = DB::Table('c_system_message')->where('user_id',$info->id)->where('read',0)->count();
+                $data1 = [
+                    "type"      => "msgBox",
+                    "count"     => $count
+                ];
+                $this->sendByUid($server,$info->id,$data);
+                $this->sendByUid($server,$info->id,$data1,true);
+                break;
+            case "refuseFriend":
+                $id = $info->id;//消息id
+                $system_message = DB::table('c_system_message')->find($id);
+                //获取该接受者未读消息数量
+                $count = DB::Table('c_system_message')->where('user_id',$system_message->from_id)->where('read',0)->count();
+                $data = [
+                    "type"      => "msgBox",
+                    "count"     => $count
+                ];
+                $this->sendByUid($server,$system_message->from_id,$data);
+                break;
+            case "joinNotify":
+                $groupid = $info->groupid;
+                $list = DB::table('c_group_member')->where('group_id',$groupid)->get();
+                $data = [
+                    "type" => "joinNotify",
+                    "data"  => [
+                        "system"    => true,
+                        "id"        => $groupid,
+                        "type"      => "group",
+                        "content"   => $userInfo->nickname."加入了群聊，欢迎下新人吧～"
+                    ]
+                ];
+                foreach ($list as $k=>$v) {
+                    $this->sendByUid($server,$v->user_id,$data);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    public function onClose(\swoole_websocket_server $server, $fd, $reactorId)
+    {
+        // throw new \Exception('an exception');// 此时抛出的异常上层会忽略，并记录到Swoole日志，需要开发者try/catch捕获处理
+        $uid = app('swoole')->wsTable->get('fd:' . $fd);
+        $friend_list = DB::table('c_friend')->where('user_id',$uid['value'])->get();
+        $data = [
+            "type"  => "friendStatus",
+            "uid"   => $uid['value'],
+            "status"=> 'offline'
+        ];
+        foreach ($friend_list as $k => $v) {
+            $this->sendByUid($server,$v->friend_id,$data);
+        }
+        if ($uid !== false) {
+            app('swoole')->wsTable->del('uid:' . $uid['value']);// 解绑uid映射
+        }
+        app('swoole')->wsTable->del('fd:' . $fd);// 解绑fd映射
+        DB::table('users')->where('id',$uid)->update(['line_status' => 'offline']);
     }
 }

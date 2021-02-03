@@ -158,7 +158,7 @@ return [
 
         // Image and file upload path under the disk above.
         'directory' => [
-            'image' => 'images',
+            'image' => date("Ym/d", time()),
             'file'  => 'files',
         ],
     ],
@@ -396,6 +396,18 @@ return [
     |
     */
     'extensions' => [
+        'wang-editor' => [
 
+            // 如果要关掉这个扩展，设置为false
+            'enable' => true,
+
+            // 编辑器的配置
+            // 编辑器的配置
+            'config' => [
+                // `/upload`接口用来上传文件，上传逻辑要自己实现，可参考下面的`上传图片`
+                'uploadImgServer' => '/upload',
+                'uploadFileName' => 'upload_file'
+            ]
+        ],
     ],
 ];

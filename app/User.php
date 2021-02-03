@@ -19,9 +19,13 @@ class User extends Authenticatable implements JWTSubject
      * @var array
      */
     protected $fillable = [
-        'name', 'mobile', 'password',
+        'name', 'mobile', 'password','nickname','avatar','sign'
     ];
+    protected $attributes = [
+        'avatar' => '/uploads/images/avatar/default.jpg',
+        'line_status' =>'offline'
 
+    ];
     /**
      * The attributes that should be hidden for arrays.
      *
@@ -39,6 +43,19 @@ class User extends Authenticatable implements JWTSubject
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public function setAvatarAttribute($value)
+    {
+        $result = empty($value) ? '' : str_replace(env('APP_URL'),'',$value);
+        //处理后台和前端上传的文件路径
+        return $this->attributes['avatar'] = empty($result) ? '' : (strpos($result,'/uploads/')!==false ? $result : '/uploads/images/admin/'.$result);
+
+    }
+    public function getAvatarAttribute($value)
+    {
+        return $this->attributes['avatar'] = empty($value) ? '' : (strpos($value,env('APP_URL'))!==false ? $value : env('APP_URL').$value);
+
+    }
     public function getJWTIdentifier()
     {
         return $this->getKey();
@@ -69,7 +86,7 @@ class User extends Authenticatable implements JWTSubject
     }
     public function getList($params){
         $query = self::newQuery();
-        if(isset($params['tid']) && !empty($params['tid'])) $query->where('tid','=',$params['tid']);
+        if(isset($params['mobile']) && !empty($params['mobile'])) $query->where('mobile','=',$params['mobile']);
         if(isset($params['name']) && !empty($params['name']))  $query->where('name','like',$params['name'].'%');
         if(isset($params['status']) && !empty($params['status']))  $query->where('status','=',$params['status']);
         if(isset($params['page']) && !empty($params['page'])){

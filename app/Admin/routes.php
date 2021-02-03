@@ -19,5 +19,7 @@ Route::group([
     $router->resource('bill', BillController::class);
     $router->resource('product', ProductController::class);
     $router->resource('modType', ModTypeController::class);
+    $router->resource('categories', CategoriesController::class);
+    $router->post('/uploadFile', 'UploadsController@uploadImg');
 
 });

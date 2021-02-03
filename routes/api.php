@@ -18,15 +18,43 @@ Route::get('/ss', 'RegisterController@store');
 //Route::any('/products/index', 'ProductsController@index');
 Route::get('/line','ChatController@index');
 Route::any('/mod/index','ModController@index');
+Route::any('/user/index','UserController@index');
+
+
+Route::middleware('api.refresh')->group(function($router) {
+    $router->any('userInfo','ChatController@userInfo');
+
+
+    $router->get('groupMembers',['uses' => 'ChatController@groupMember']);
+    $router->post('joinGroup',['uses' => 'ChatController@joinGroup']);
+    $router->post('addFriend',['uses' => 'ChatController@addFriend']);
+    $router->post('refuseFriend',['uses' => 'ChatController@refuseFriend']);
+    $router->post('createGroup',['uses' => 'ChatController@createGroup']);
+    $router->post('messageBox',['uses' => 'ChatController@messageBox']);
+    $router->post('updateSign',['uses' => 'ChatController@updateSign']);
+    $router->any('chatRecordData',['uses' => 'ChatController@chatRecordData']);
+
+
+
+});
+
+//聊天上传图片或文件
+Route::post('/upload', 'ChatController@upload');
+
+Route::middleware('cors')->group(function () {
+    Route::post('/uploadFile', 'UploadsController@uploadImg');
+
+});
 
 Route::group([
     'prefix' => 'auth'
 ], function ($router) {
     Route::post('login', 'AuthController@login');
     Route::post('register', 'AuthController@register');
-    Route::post('logout', 'AuthController@logout');
+    Route::post('logOut', 'AuthController@logOut');
     Route::post('refresh', 'AuthController@refresh');
-    Route::post('me', 'AuthController@me');
+    Route::any('getUser', 'AuthController@getUser');
+
 });
 
 
